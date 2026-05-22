@@ -1,111 +1,98 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     int id;
-    char name[30];
-    float cgpa;
+    char name[50];
+    float gpa;
 } Student;
 
-void storeRecords(int n,const char *filename);
-void getRecord(int m,const char *filename);
-void deleteRecord(int m,const char *filename);
 
-int main() 
-{
-    const char *filename = "students.dat";
-    int n, m, choice,idtodel;
- 
-    printf("Enter number of records to store: ");
-    scanf("%d", &n);
-    storeRecords(n,filename);
-
-    printf("\nEnter record number to retrieve: ");
-    scanf("%d", &m);
-    getRecord(m,filename);
-
-    printf("\nEnter record number to delete: ");
-    scanf("%d", &idtodel);
-
-
-    deleteRecord(idtodel,filename);
-
-    return 0;
-}
-
-
-void storeRecords(int n,const char *filename) {
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) return;
-
-    Student s;
+void input_records(Student* data, int n) {
     for (int i = 0; i < n; i++) {
-        printf("Enter ID, Name, GPA for student %d: ", i + 1);
-        scanf("%d %s %f", &s.id, s.name, &s.cgpa);
-        fwrite(&s, sizeof(Student), 1, fp);
+        printf("\n--- Entry %d ---\n", i + 1);
+        printf("Enter ID: ");
+        scanf("%d", &data[i].id);
+        
+        printf("Enter Name: ");
+        scanf(" %[^\n]s", data[i].name); 
+        
+        printf("Enter GPA: ");
+        scanf("%f", &data[i].gpa);
     }
-    fclose(fp);
 }
 
 
-void getRecord(int m,const char *filename) {
-    FILE *fp = fopen(filename, "rb");
+long* create_indexed_file(const char* filename, Student* data, int n) {
+    FILE* fp = fopen(filename, "w");
+    if (!fp) return NULL;
+
+    long* positions = malloc(n * sizeof(long));
+
+    for (int i = 0; i < n; i++) {
+   
+        positions[i] = ftell(fp);
+        
+   
+        fprintf(fp, "%d %s %.2f\n", data[i].id, data[i].name, data[i].gpa);
+    }
+
+    fclose(fp);
+    return positions;
+}
+
+
+void display_record_at(const char* filename, long pos) {
+    FILE* fp = fopen(filename, "r");
     if (!fp) return;
 
-    Student s;
-    // Seek to (m-1) * size of one structure
-    fseek(fp, (m - 1) * sizeof(Student), SEEK_SET);
+    fseek(fp, pos, SEEK_SET);
 
-    if (fread(&s, sizeof(Student), 1, fp)) {
-        printf("\nRecord %d: ID=%d, Name=%s, GPA=%.2f\n", m, s.id, s.name, s.cgpa);
+    int id;
+    char name[50];
+    float gpa;
+
+    if (fscanf(fp, "%d %s %f", &id, name, &gpa) == 3) {
+        printf("\n[Seek Success] Offset %ld -> ID: %d, Name: %s, GPA: %.2f\n", pos, id, name, gpa);
     } else {
-        printf("\nRecord not found.\n");
+        printf("\nError reading record at position %ld\n", pos);
     }
+
     fclose(fp);
 }
 
+int main() {
+    int n;
+    const char* db_file = "students.txt";
 
-void deleteRecord(int targetId,const char *filename) {
-    FILE *fp = fopen(filename, "rb");
-    FILE *temp = fopen("temp.dat", "wb");
+    printf("Enter number of records to create: ");
+    scanf("%d", &n);
 
-    if (!fp || !temp) {
-        printf("Error opening files.\n");
-        return;
-    }
-    Student s;
-    int found = 0;
 
-    // Read every record from the source file
-    while (fread(&s, sizeof(Student), 1, fp)) {
-        
-        if (s.id == targetId) {
-            found = 1;
+    Student* list = (Student*)malloc(n * sizeof(Student));
+
+
+    input_records(list, n);
+
+
+    long* seek_positions = create_indexed_file(db_file, list, n);
+
+
+    if (n > 0) {
+        int choice;
+        printf("\nEnter record index to retrieve (0 to %d): ", n - 1);
+        scanf("%d", &choice);
+
+        if (choice >= 0 && choice < n) {
+            display_record_at(db_file, seek_positions[choice]);
         } else {
-            fwrite(&s, sizeof(Student), 1, temp);
+            printf("Invalid index.\n");
         }
     }
 
-    
-    fclose(fp);  
-    fclose(temp);
-     
-    
-    remove(filename);
-    rename("temp.dat", filename);
 
-    if (found) {
-        printf("Record with ID %d deleted.\n", targetId);
-    } else {
-        printf("Record with ID %d not found.\n", targetId);
-    }
-    printf("\n--- Updated Records ---\n");
-    FILE *finalFp = fopen(filename, "rb");
-    if (finalFp) {
-        int i = 1;
-        while (fread(&s, sizeof(Student), 1, finalFp)) {
-            printf("Record %d: ID=%d, Name=%s, GPA=%.2f\n", i++, s.id, s.name, s.cgpa);
-        }
-    fclose(finalFp);
-    }
+    free(list);
+    free(seek_positions);
+    return 0;
 }
