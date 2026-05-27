@@ -32,6 +32,6 @@ int main() {
     
     printf("Neg %d: ",negInt); 
     printBits(negInt); 
-    printf(" (Notice the leading 1s)\n");
+    printf(" (Set bits: %d)\n", countSetBits(negInt));
     return 0;
 }
